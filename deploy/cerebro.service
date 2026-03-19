@@ -1,0 +1,16 @@
+[Unit]
+Description=Cerebro Knowledge Graph API
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=lcasinelli
+WorkingDirectory=/srv/cerebro
+EnvironmentFile=/srv/cerebro/.env
+ExecStart=/usr/bin/node dist/api/server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

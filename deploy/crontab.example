@@ -1,0 +1,8 @@
+# Cerebro cron jobs — add to lcasinelli's crontab on ubuntu-server1
+# Install with: crontab deploy/crontab.example
+
+# Nightly backup at 2:00 AM
+0 2 * * * /srv/cerebro/scripts/backup.sh >> /var/log/cerebro-backup.log 2>&1
+
+# Weekly sync integrity check — Sunday at 3:00 AM
+0 3 * * 0 cd /srv/cerebro && /usr/bin/npx tsx scripts/sync-check.ts >> /var/log/cerebro-sync.log 2>&1
