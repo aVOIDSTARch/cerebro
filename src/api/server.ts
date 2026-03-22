@@ -1,6 +1,12 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { authHook } from "./auth.js";
+import { createCloakState } from "../cloak/types.js";
+import {
+  registerWithCloak,
+  listenHaltStream,
+  type CloakClientConfig,
+} from "../cloak/client.js";
+import { createAuthHook } from "../cloak/auth.js";
 import { entityRoutes } from "./routes/entities.js";
 import { assertionRoutes } from "./routes/assertions.js";
 import { sourceRoutes } from "./routes/sources.js";
@@ -19,9 +25,31 @@ const app = Fastify({
   },
 });
 
+// Cloak integration
+const cloakState = createCloakState();
+const cloakConfig: CloakClientConfig = {
+  cloakUrl: process.env.CLOAK_URL ?? "http://localhost:8300",
+  manifestToken: process.env.CLOAK_MANIFEST_TOKEN ?? "",
+  serviceId: "cerebro",
+  serviceType: "knowledge_graph",
+  version: "0.1.0",
+  capabilities: ["entities", "assertions", "search", "quarantine"],
+};
+
+// Register with Cloak (non-fatal if Cloak not running)
+try {
+  const haltUrl = await registerWithCloak(cloakConfig, cloakState);
+  // Start SSE halt listener in background (fire and forget)
+  listenHaltStream(cloakConfig, cloakState, haltUrl).catch((err) =>
+    console.error("[cloak] halt listener error:", err),
+  );
+} catch (err) {
+  console.warn(`[cloak] Registration failed (continuing without): ${err}`);
+}
+
 // Global hooks
 await app.register(cors, { origin: true });
-app.addHook("onRequest", authHook);
+app.addHook("onRequest", createAuthHook(cloakState));
 
 // Routes
 await app.register(adminRoutes);
@@ -32,6 +60,6 @@ await app.register(citationRoutes, { prefix: "/citations" });
 await app.register(searchRoutes, { prefix: "/search" });
 await app.register(quarantineRoutes, { prefix: "/quarantine" });
 
-const PORT = Number(process.env.PORT ?? 3000);
+const PORT = Number(process.env.PORT ?? 8101);
 await app.listen({ port: PORT, host: "0.0.0.0" });
 console.log(`Cerebro API listening on :${PORT}`);
